@@ -2,10 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Real-Time Voice Translator</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
+    /* Prevent zoom on iOS */
+    input, select, textarea, button {
+      font-size: 16px;
+    }
+    
     .pulse-ring {
       animation: pulse-ring 1.25s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
     }
@@ -21,26 +26,64 @@
       0%, 100% { opacity: 1; }
       50% { opacity: 0.7; }
     }
+    
+    .auto-play-button {
+      animation: bounce 1s infinite;
+    }
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-5px); }
+    }
+    
+    /* Mobile-specific styles */
+    @media (max-width: 640px) {
+      .container {
+        padding: 1rem;
+        margin: 0;
+      }
+    }
+    
+    /* Prevent iOS rubber band scrolling */
+    body {
+      overscroll-behavior: none;
+      -webkit-overflow-scrolling: touch;
+    }
   </style>
 </head>
-<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen flex items-center justify-center p-4">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-8">
-    <div class="text-center mb-8">
-      <h1 class="text-3xl font-bold text-gray-800 mb-2">Real-Time Translator</h1>
-      <p class="text-gray-600">Speak naturally, get instant translations</p>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen flex items-center justify-center p-2 sm:p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-4 sm:p-8 container">
+    <div class="text-center mb-6 sm:mb-8">
+      <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">Real-Time Translator</h1>
+      <p class="text-gray-600 text-sm sm:text-base">Speak naturally, get instant translations</p>
+    </div>
+
+    <!-- Mobile Auto-play Setup -->
+    <div id="autoplaySetup" class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg mb-4 hidden">
+      <strong>Enable Auto-play:</strong> Tap the button below to enable automatic audio playback on this device.
+      <button id="enableAutoplay" class="block w-full mt-2 bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 auto-play-button">
+        🔊 Enable Auto-play Audio
+      </button>
     </div>
 
     <!-- Compatibility Warning -->
     <div id="compatibilityWarning" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-4 hidden">
-      <strong>Warning:</strong> This app requires HTTPS or localhost to access microphone.
+      <strong>Warning:</strong> This app requires HTTPS and microphone permissions.
+    </div>
+
+    <!-- Mobile Permission Request -->
+    <div id="permissionRequest" class="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded-lg mb-4 hidden">
+      <strong>Permission Required:</strong> Please allow microphone access when prompted.
+      <button id="requestPermission" class="block w-full mt-2 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+        Enable Microphone
+      </button>
     </div>
 
     <!-- Device Selection -->
     <div class="space-y-4 mb-6">
-      <select id="micSelect" class="w-full p-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none transition-colors">
+      <select id="micSelect" class="w-full p-3 text-base border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none transition-colors">
         <option value="">Loading microphones...</option>
       </select>
-      <select id="targetLang" class="w-full p-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none transition-colors">
+      <select id="targetLang" class="w-full p-3 text-base border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none transition-colors">
         <option value="French">French</option>
         <option value="Spanish">Spanish</option>
         <option value="German">German</option>
@@ -56,34 +99,43 @@
         <option value="Swedish">Swedish</option>
         <option value="Norwegian">Norwegian</option>
       </select>
+      
+      <!-- Auto-play toggle -->
+      <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+        <span class="text-sm font-medium text-gray-700">Auto-play translations</span>
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" id="autoplayToggle" class="sr-only peer" checked>
+          <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+        </label>
+      </div>
     </div>
 
     <!-- Recording Controls -->
     <div class="flex justify-center mb-6">
       <div class="relative">
-        <button id="startBtn" class="bg-blue-500 hover:bg-blue-600 text-white rounded-full p-6 shadow-lg transition-all duration-200 transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:transform-none">
+        <button id="startBtn" class="bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white rounded-full p-6 shadow-lg transition-all duration-200 transform active:scale-95 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:transform-none touch-manipulation">
           <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
             <path fill-rule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clip-rule="evenodd"></path>
           </svg>
         </button>
 
-        <button id="stopBtn" class="recording-indicator text-white rounded-full p-6 shadow-lg hidden">
+        <button id="stopBtn" class="recording-indicator text-white rounded-full p-6 shadow-lg hidden touch-manipulation">
           <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
             <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clip-rule="evenodd"></path>
           </svg>
         </button>
 
         <!-- Pulse rings for recording indicator -->
-        <div id="pulseRings" class="absolute inset-0 hidden">
+        <div id="pulseRings" class="absolute inset-0 hidden pointer-events-none">
           <div class="pulse-ring absolute inset-0 border-4 border-red-400 rounded-full"></div>
-          <div class="pulse-ring absolute inset-0 border-4 border-red-400 rounded-full animation-delay-75"></div>
+          <div class="pulse-ring absolute inset-0 border-4 border-red-400 rounded-full" style="animation-delay: 0.75s;"></div>
         </div>
       </div>
     </div>
 
     <!-- Status Display -->
     <div class="text-center mb-6">
-      <p id="status" class="text-lg font-medium text-gray-700">Checking compatibility...</p>
+      <p id="status" class="text-base sm:text-lg font-medium text-gray-700">Checking compatibility...</p>
       <p id="timing" class="text-sm text-gray-500 mt-1"></p>
     </div>
 
@@ -102,25 +154,41 @@
     <div id="output" class="space-y-4">
       <div class="bg-blue-50 p-4 rounded-lg">
         <h3 class="font-semibold text-blue-800 mb-2">Original:</h3>
-        <p id="transcription" class="text-gray-700 min-h-[2rem]"></p>
+        <p id="transcription" class="text-gray-700 min-h-[2rem] text-sm sm:text-base"></p>
       </div>
-      <div class="bg-green-50 p-4 rounded-lg">
+      <div class="bg-green-50 p-4 rounded-lg relative">
         <h3 class="font-semibold text-green-800 mb-2">Translation:</h3>
-        <p id="translation" class="text-gray-700 font-medium min-h-[2rem]"></p>
+        <p id="translation" class="text-gray-700 font-medium min-h-[2rem] text-sm sm:text-base"></p>
+        <!-- Manual play button for when auto-play fails -->
+        <button id="manualPlayBtn" class="absolute top-2 right-2 bg-green-500 text-white p-2 rounded-full hover:bg-green-600 hidden touch-manipulation">
+          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path>
+          </svg>
+        </button>
       </div>
       <p id="detectedLang" class="text-xs text-gray-500 text-center"></p>
     </div>
 
     <!-- Audio Playback -->
-    <audio id="ttsAudio" class="w-full mt-4 hidden" controls></audio>
+    <audio id="ttsAudio" class="w-full mt-4 hidden" controls playsinline preload="none"></audio>
+    
+    <!-- Mobile Instructions -->
+    <div class="mt-6 p-3 bg-yellow-50 rounded-lg text-sm text-yellow-800">
+      <strong>Mobile Tips:</strong> 
+      <ul class="mt-1 space-y-1">
+        <li>• Tap "Enable Auto-play Audio" above for automatic playback</li>
+        <li>• Use the play button if audio doesn't start automatically</li>
+        <li>• Keep the app in foreground for best performance</li>
+      </ul>
+    </div>
   </div>
 
   <script>
     let stream, audioContext, processor, mediaRecorder;
     let isRecording = false;
     let vadInterval;
-    const vadThreshold = 0.005; // Lower threshold for better sensitivity
-    const chunkDuration = 1500; // Shorter chunks for faster processing
+    const vadThreshold = 0.01; // Adjusted for mobile
+    const chunkDuration = 2000; // Longer chunks for mobile stability
     let audioQueue = [];
     let isSpeaking = false;
     let isCompatible = false;
@@ -128,7 +196,11 @@
     let lastProcessTime = 0;
     let silenceStart = 0;
     let silenceDuration = 0;
-    const maxSilenceDuration = 800; // Stop recording after 800ms of silence
+    const maxSilenceDuration = 1200; // Longer silence for mobile
+    let permissionGranted = false;
+    let autoplayEnabled = false;
+    let userInteracted = false;
+    let audioContextUnlocked = false;
 
     const startBtn = document.getElementById('startBtn');
     const stopBtn = document.getElementById('stopBtn');
@@ -140,8 +212,14 @@
     const micSelect = document.getElementById('micSelect');
     const targetLang = document.getElementById('targetLang');
     const compatibilityWarning = document.getElementById('compatibilityWarning');
+    const permissionRequest = document.getElementById('permissionRequest');
+    const requestPermissionBtn = document.getElementById('requestPermission');
     const ttsAudio = document.getElementById('ttsAudio');
     const pulseRings = document.getElementById('pulseRings');
+    const autoplaySetup = document.getElementById('autoplaySetup');
+    const enableAutoplayBtn = document.getElementById('enableAutoplay');
+    const autoplayToggle = document.getElementById('autoplayToggle');
+    const manualPlayBtn = document.getElementById('manualPlayBtn');
 
     // VAD indicators
     const vadIndicators = [
@@ -152,13 +230,204 @@
       document.getElementById('vad5')
     ];
 
-    // Check browser compatibility
+    // Mobile detection
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isAndroid = /Android/i.test(navigator.userAgent);
+
+    // Create a silent audio file for unlocking autoplay
+    const silentAudio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjQ1LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV6urq6urq6urq6urq6urq6urq6urq6urq6v////////////////////////////////8AAAAATGF2YzU4Ljg5AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//OEZAAAHx4AAP4QcQUBAAAIAAAAEADAAAACAAABAAgAAgAAAAABAAGAEAEQBABAAA');
+
+    // Store autoplay preference
+    function getAutoplayPreference() {
+      try {
+        return localStorage.getItem('autoplay-enabled') === 'true';
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function setAutoplayPreference(enabled) {
+      try {
+        localStorage.setItem('autoplay-enabled', enabled.toString());
+      } catch (e) {
+        // Ignore localStorage errors
+      }
+    }
+
+    // Check if autoplay is already enabled
+    function checkAutoplayStatus() {
+      const stored = getAutoplayPreference();
+      autoplayToggle.checked = stored;
+      
+      if (isMobile && !userInteracted) {
+        autoplaySetup.classList.remove('hidden');
+      }
+    }
+
+    // Unlock audio context for mobile
+    async function unlockAudioContext() {
+      if (audioContextUnlocked) return true;
+
+      try {
+        // Create a temporary audio context
+        const tempContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // Create a silent buffer
+        const buffer = tempContext.createBuffer(1, 1, 22050);
+        const source = tempContext.createBufferSource();
+        source.buffer = buffer;
+        source.connect(tempContext.destination);
+        source.start(0);
+        
+        await tempContext.close();
+        audioContextUnlocked = true;
+        
+        // Try to play silent audio to unlock further
+        try {
+          silentAudio.volume = 0;
+          await silentAudio.play();
+          silentAudio.pause();
+          silentAudio.currentTime = 0;
+        } catch (e) {
+          console.log('Silent audio unlock failed:', e);
+        }
+        
+        return true;
+      } catch (error) {
+        console.log('Audio context unlock failed:', error);
+        return false;
+      }
+    }
+
+    // Enable autoplay functionality
+    async function enableAutoplay() {
+      try {
+        userInteracted = true;
+        
+        // Unlock audio context
+        await unlockAudioContext();
+        
+        // Test audio playback
+        try {
+          const testAudio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=');
+          testAudio.volume = 0.1;
+          await testAudio.play();
+          testAudio.pause();
+          
+          autoplayEnabled = true;
+          setAutoplayPreference(true);
+          autoplaySetup.classList.add('hidden');
+          
+          status.textContent = 'Auto-play enabled! Ready to translate.';
+          
+          // Show success message briefly
+          const successMsg = document.createElement('div');
+          successMsg.className = 'fixed top-4 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-4 py-2 rounded-lg z-50';
+          successMsg.textContent = '✓ Auto-play enabled!';
+          document.body.appendChild(successMsg);
+          
+          setTimeout(() => {
+            successMsg.remove();
+            status.textContent = 'Ready to translate';
+          }, 2000);
+          
+        } catch (playError) {
+          throw new Error('Autoplay test failed');
+        }
+        
+        return true;
+      } catch (error) {
+        console.log('Enable autoplay failed:', error);
+        status.textContent = 'Auto-play setup failed. Manual play will be available.';
+        return false;
+      }
+    }
+
+    // Enhanced audio playback with fallbacks
+    async function playTranslationAudio(audioData) {
+      if (!audioData) return false;
+
+      try {
+        // Set audio source
+        ttsAudio.src = `data:audio/mp3;base64,${audioData}`;
+        ttsAudio.load(); // Ensure audio is loaded
+        
+        // Show manual play button as backup
+        manualPlayBtn.classList.remove('hidden');
+        manualPlayBtn.onclick = () => playAudioManually(audioData);
+        
+        // Try autoplay if enabled and user has interacted
+        if (autoplayToggle.checked && (autoplayEnabled || userInteracted)) {
+          try {
+            // Add a small delay to ensure audio is ready
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            await ttsAudio.play();
+            status.textContent = 'Playing translation...';
+            manualPlayBtn.classList.add('hidden'); // Hide manual button if autoplay works
+            return true;
+            
+          } catch (autoplayError) {
+            console.log('Autoplay failed:', autoplayError);
+            
+            // Show user-friendly message
+            if (isIOS) {
+              status.textContent = 'Translation ready - tap ▶️ to play';
+            } else {
+              status.textContent = 'Translation ready - tap play button';
+            }
+            
+            // Flash the manual play button to draw attention
+            manualPlayBtn.style.animation = 'bounce 0.5s ease-in-out 3';
+            setTimeout(() => {
+              manualPlayBtn.style.animation = '';
+            }, 1500);
+          }
+        } else {
+          status.textContent = 'Translation ready - tap ▶️ to play';
+        }
+        
+        return false;
+      } catch (error) {
+        console.error('Audio setup failed:', error);
+        status.textContent = 'Translation ready (audio unavailable)';
+        return false;
+      }
+    }
+
+    // Manual audio playback
+    async function playAudioManually(audioData) {
+      try {
+        if (!userInteracted) {
+          userInteracted = true;
+          await unlockAudioContext();
+        }
+        
+        ttsAudio.src = `data:audio/mp3;base64,${audioData}`;
+        await ttsAudio.play();
+        status.textContent = 'Playing translation...';
+        manualPlayBtn.classList.add('hidden');
+      } catch (error) {
+        console.error('Manual play failed:', error);
+        // Fallback: show audio controls
+        ttsAudio.classList.remove('hidden');
+        status.textContent = 'Use audio controls below to play';
+      }
+    }
+
+    // Check browser compatibility with mobile-specific checks
     function checkCompatibility() {
-      const isSecure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+      const isSecure = location.protocol === 'https:' || 
+                      location.hostname === 'localhost' || 
+                      location.hostname === '127.0.0.1' ||
+                      location.hostname.includes('ngrok') ||
+                      location.hostname.includes('vercel') ||
+                      location.hostname.includes('netlify');
 
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         compatibilityWarning.classList.remove('hidden');
-        status.textContent = 'Browser not supported or insecure context';
+        status.textContent = 'Browser not supported';
         startBtn.disabled = true;
         return false;
       }
@@ -170,14 +439,77 @@
         return false;
       }
 
+      // Show permission request for mobile
+      if (isMobile && !permissionGranted) {
+        permissionRequest.classList.remove('hidden');
+        status.textContent = 'Microphone permission required';
+        return false;
+      }
+
       return true;
     }
 
-    // Populate microphone devices
+    // Request microphone permission (especially important for mobile)
+    async function requestMicrophonePermission() {
+      try {
+        status.textContent = 'Requesting microphone access...';
+        
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleRate: { ideal: 16000 },
+            channelCount: { ideal: 1 }
+          } 
+        });
+        
+        // Stop the stream immediately - we just needed permission
+        stream.getTracks().forEach(track => track.stop());
+        
+        permissionGranted = true;
+        userInteracted = true; // Microphone permission counts as user interaction
+        permissionRequest.classList.add('hidden');
+        await populateMics();
+        
+        return true;
+      } catch (error) {
+        console.error('Permission denied:', error);
+        handlePermissionError(error);
+        return false;
+      }
+    }
+
+    // Handle permission errors with mobile-specific messages
+    function handlePermissionError(error) {
+      let message = 'Microphone access denied';
+      
+      if (error.name === 'NotAllowedError') {
+        if (isIOS) {
+          message = 'Microphone blocked. Go to Settings > Safari > Camera & Microphone to allow access.';
+        } else if (isMobile) {
+          message = 'Microphone blocked. Check your browser settings to allow microphone access.';
+        } else {
+          message = 'Microphone access denied. Please allow microphone access and refresh.';
+        }
+      } else if (error.name === 'NotFoundError') {
+        message = 'No microphone found. Please check your device.';
+      } else if (error.name === 'NotReadableError') {
+        message = 'Microphone is being used by another app. Please close other apps and try again.';
+      }
+      
+      status.textContent = message;
+      compatibilityWarning.classList.remove('hidden');
+      compatibilityWarning.innerHTML = `<strong>Error:</strong> ${message}`;
+    }
+
+    // Populate microphone devices with mobile considerations
     async function populateMics() {
       try {
-        // Request permission first
-        await navigator.mediaDevices.getUserMedia({ audio: true });
+        if (!permissionGranted) {
+          const granted = await requestMicrophonePermission();
+          if (!granted) return;
+        }
 
         const devices = await navigator.mediaDevices.enumerateDevices();
         micSelect.innerHTML = '';
@@ -191,7 +523,7 @@
 
         const defaultOption = document.createElement('option');
         defaultOption.value = '';
-        defaultOption.text = 'Default Microphone';
+        defaultOption.text = isMobile ? 'Built-in Microphone' : 'Default Microphone';
         micSelect.appendChild(defaultOption);
 
         audioInputs.forEach((device, index) => {
@@ -202,18 +534,20 @@
         });
 
         status.textContent = 'Ready to translate';
+        startBtn.disabled = false;
+        isCompatible = true;
+
       } catch (error) {
         console.error('Error accessing microphones:', error);
-        micSelect.innerHTML = '<option value="">Error accessing microphones</option>';
-        status.textContent = 'Microphone access denied';
+        handlePermissionError(error);
       }
     }
 
-    // Enhanced Voice Activity Detection
+    // Enhanced Voice Activity Detection for mobile
     function setupVAD(source) {
       const analyser = audioContext.createAnalyser();
-      analyser.fftSize = 1024; // Smaller for faster processing
-      analyser.smoothingTimeConstant = 0.3;
+      analyser.fftSize = isMobile ? 512 : 1024; // Smaller for mobile performance
+      analyser.smoothingTimeConstant = 0.5; // More smoothing for mobile
 
       const bufferLength = analyser.frequencyBinCount;
       const dataArray = new Float32Array(bufferLength);
@@ -225,7 +559,7 @@
 
         analyser.getFloatTimeDomainData(dataArray);
 
-        // Calculate RMS
+        // Calculate RMS with mobile-optimized threshold
         let sum = 0;
         for (let i = 0; i < bufferLength; i++) {
           sum += dataArray[i] * dataArray[i];
@@ -253,9 +587,9 @@
         if (isProcessing) {
           status.textContent = 'Processing...';
         } else if (isSpeaking) {
-          status.textContent = 'Listening... (Speaking detected)';
+          status.textContent = 'Listening... 🎤';
         } else {
-          status.textContent = 'Listening... (Waiting for speech)';
+          status.textContent = 'Listening...';
         }
 
         requestAnimationFrame(updateVAD);
@@ -266,7 +600,7 @@
 
     // Update voice activity indicators
     function updateVoiceIndicators(level) {
-      const normalizedLevel = Math.min(level * 50, 1); // Normalize and amplify
+      const normalizedLevel = Math.min(level * (isMobile ? 30 : 50), 1);
 
       vadIndicators.forEach((indicator, index) => {
         const threshold = (index + 1) * 0.2;
@@ -280,7 +614,7 @@
       });
     }
 
-    // Process audio with optimizations
+    // Process audio with mobile optimizations
     async function processAudio(blob) {
       if (isProcessing) return;
 
@@ -296,6 +630,7 @@
           try {
             const base64Audio = reader.result.split(',')[1];
 
+            // Use relative URL for mobile compatibility
             const response = await fetch('/transcribe', {
               method: 'POST',
               headers: {
@@ -306,6 +641,10 @@
                 target_language: targetLang.value
               })
             });
+
+            if (!response.ok) {
+              throw new Error(`Server error: ${response.status}`);
+            }
 
             const data = await response.json();
 
@@ -320,20 +659,14 @@
             transcriptionEl.textContent = data.transcription;
             translationEl.textContent = data.translation;
             detectedLangEl.textContent = `Detected: ${data.detected_language} | Processing: ${processingTime}ms`;
-            timing.textContent = `Last processing time: ${processingTime}ms`;
+            timing.textContent = `Processing time: ${processingTime}ms`;
 
-            // Auto-play TTS
+            // Enhanced audio playback with mobile support
             if (data.tts_audio) {
-              ttsAudio.src = `data:audio/mp3;base64,${data.tts_audio}`;
+              await playTranslationAudio(data.tts_audio);
               ttsAudio.classList.remove('hidden');
-
-              try {
-                await ttsAudio.play();
-                status.textContent = 'Playing translation...';
-              } catch (playError) {
-                console.log('Auto-play prevented');
-                status.textContent = 'Translation ready';
-              }
+            } else {
+              status.textContent = 'Translation complete (no audio)';
             }
 
           } catch (error) {
@@ -351,29 +684,42 @@
       }
     }
 
-    // Start recording with optimizations
+    // Start recording with mobile optimizations
     async function startRecording() {
       if (!isCompatible) {
-        alert('Browser not compatible or secure context required');
-        return;
+        if (!permissionGranted) {
+          const granted = await requestMicrophonePermission();
+          if (!granted) return;
+          isCompatible = checkCompatibility();
+          if (!isCompatible) return;
+        }
       }
 
       try {
+        // Mark user interaction for autoplay
+        if (!userInteracted) {
+          userInteracted = true;
+          await unlockAudioContext();
+        }
+
         const constraints = {
           audio: {
             deviceId: micSelect.value ? { exact: micSelect.value } : undefined,
             echoCancellation: true,
             noiseSuppression: true,
             autoGainControl: true,
-            sampleRate: 16000, // Optimal for Whisper
+            sampleRate: isMobile ? { ideal: 16000 } : 16000, // More flexible for mobile
             channelCount: 1
           }
         };
 
         stream = await navigator.mediaDevices.getUserMedia(constraints);
 
+        // Mobile-friendly AudioContext setup
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-        audioContext = new AudioContextClass({ sampleRate: 16000 });
+        audioContext = new AudioContextClass({ 
+          sampleRate: isMobile ? undefined : 16000 // Let mobile decide
+        });
 
         if (audioContext.state === 'suspended') {
           await audioContext.resume();
@@ -382,14 +728,18 @@
         const source = audioContext.createMediaStreamSource(stream);
         setupVAD(source);
 
-        // Setup MediaRecorder with optimized settings
-        const options = {
-          mimeType: 'audio/webm;codecs=opus',
-          audioBitsPerSecond: 16000 // Lower bitrate for speed
-        };
-
-        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+        // Mobile-optimized MediaRecorder settings
+        let options = { audioBitsPerSecond: 16000 };
+        
+        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+          options.mimeType = 'audio/webm;codecs=opus';
+        } else if (MediaRecorder.isTypeSupported('audio/webm')) {
           options.mimeType = 'audio/webm';
+        } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+          options.mimeType = 'audio/mp4';
+        } else {
+          // Fallback for older mobile browsers
+          options = {};
         }
 
         mediaRecorder = new MediaRecorder(stream, options);
@@ -403,7 +753,7 @@
 
         mediaRecorder.onstop = async () => {
           if (chunks.length > 0) {
-            const blob = new Blob(chunks, { type: options.mimeType });
+            const blob = new Blob(chunks, { type: options.mimeType || 'audio/webm' });
             if (blob.size > 500) { // Minimum size check
               await processAudio(blob);
             }
@@ -413,10 +763,9 @@
 
         mediaRecorder.start();
 
-        // Adaptive chunk timing based on speech detection
+        // Mobile-friendly chunk timing
         vadInterval = setInterval(() => {
           if (isRecording && mediaRecorder && mediaRecorder.state === 'recording') {
-            // Process more frequently when speech is detected
             const shouldProcess = isSpeaking || silenceDuration > maxSilenceDuration;
 
             if (shouldProcess) {
@@ -425,7 +774,7 @@
                 if (isRecording && !isProcessing) {
                   mediaRecorder.start();
                 }
-              }, 50); // Shorter delay
+              }, 100); // Longer delay for mobile stability
             }
           }
         }, chunkDuration);
@@ -443,17 +792,23 @@
       }
     }
 
-    // Handle recording errors
+    // Handle recording errors with mobile-specific messages
     function handleRecordingError(error) {
-      status.textContent = `Error: ${error.message}`;
+      let message = `Error: ${error.message}`;
 
       if (error.name === 'NotAllowedError') {
-        alert('Microphone access denied. Please allow microphone access and refresh the page.');
+        if (isIOS) {
+          message = 'Microphone access denied. Check Safari settings: Settings > Safari > Camera & Microphone';
+        } else {
+          message = 'Microphone access denied. Please allow microphone access in your browser settings.';
+        }
       } else if (error.name === 'NotFoundError') {
-        alert('No microphone found. Please connect a microphone and try again.');
+        message = 'No microphone found. Please check your device settings.';
       } else if (error.name === 'NotReadableError') {
-        alert('Microphone is already in use by another application.');
+        message = 'Microphone busy. Close other apps using the microphone and try again.';
       }
+
+      status.textContent = message;
     }
 
     // Stop recording
@@ -492,29 +847,66 @@
       });
     }
 
-    // Initialize app
+    // Initialize app with mobile considerations
     async function initializeApp() {
+      console.log('Initializing app, mobile detected:', isMobile);
+      
+      // Check autoplay status
+      checkAutoplayStatus();
+      
       isCompatible = checkCompatibility();
 
       if (isCompatible) {
         await populateMics();
-        startBtn.disabled = false;
       }
     }
 
-    // Event listeners
+    // Event listeners with mobile touch events
     startBtn.addEventListener('click', startRecording);
-    stopBtn.addEventListener('click', stopRecording);
+    startBtn.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      startRecording();
+    });
 
-    // Handle page visibility changes
+    stopBtn.addEventListener('click', stopRecording);
+    stopBtn.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      stopRecording();
+    });
+
+    requestPermissionBtn.addEventListener('click', async () => {
+      const granted = await requestMicrophonePermission();
+      if (granted) {
+        isCompatible = checkCompatibility();
+      }
+    });
+
+    // Enable autoplay button
+    enableAutoplayBtn.addEventListener('click', enableAutoplay);
+    enableAutoplayBtn.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      enableAutoplay();
+    });
+
+    // Autoplay toggle
+    autoplayToggle.addEventListener('change', (e) => {
+      setAutoplayPreference(e.target.checked);
+      if (e.target.checked && !autoplayEnabled && isMobile) {
+        autoplaySetup.classList.remove('hidden');
+      }
+    });
+
+    // Handle page visibility changes (important for mobile background behavior)
     document.addEventListener('visibilitychange', () => {
       if (document.hidden && isRecording) {
+        console.log('Page hidden, stopping recording');
         stopRecording();
       }
     });
 
     // Handle audio playback events
     ttsAudio.addEventListener('ended', () => {
+      manualPlayBtn.classList.add('hidden');
       if (isRecording) {
         status.textContent = 'Listening...';
       } else {
@@ -522,27 +914,149 @@
       }
     });
 
-    // Keyboard shortcuts
-    document.addEventListener('keydown', (e) => {
-      if (e.code === 'Space' && !e.repeat) {
-        e.preventDefault();
-        if (!isRecording) {
-          startRecording();
-        }
+    ttsAudio.addEventListener('play', () => {
+      status.textContent = 'Playing translation...';
+      manualPlayBtn.classList.add('hidden');
+    });
+
+    ttsAudio.addEventListener('pause', () => {
+      if (isRecording) {
+        status.textContent = 'Listening...';
+      } else {
+        status.textContent = 'Ready to translate';
       }
     });
 
-    document.addEventListener('keyup', (e) => {
-      if (e.code === 'Space') {
-        e.preventDefault();
-        if (isRecording) {
-          stopRecording();
-        }
-      }
+    // Handle audio loading errors
+    ttsAudio.addEventListener('error', (e) => {
+      console.error('Audio playback error:', e);
+      status.textContent = 'Audio playback failed';
+      ttsAudio.classList.remove('hidden'); // Show controls as fallback
     });
+
+    // Mobile-friendly touch events (no keyboard shortcuts for mobile)
+    if (!isMobile) {
+      document.addEventListener('keydown', (e) => {
+        if (e.code === 'Space' && !e.repeat) {
+          e.preventDefault();
+          if (!isRecording) {
+            startRecording();
+          }
+        }
+      });
+
+      document.addEventListener('keyup', (e) => {
+        if (e.code === 'Space') {
+          e.preventDefault();
+          if (isRecording) {
+            stopRecording();
+          }
+        }
+      });
+    }
+
+    // Detect user interaction for autoplay unlock
+    const interactionEvents = ['touchstart', 'touchend', 'mousedown', 'keydown'];
+    
+    function handleUserInteraction() {
+      if (!userInteracted) {
+        userInteracted = true;
+        unlockAudioContext();
+        
+        // Remove listeners after first interaction
+        interactionEvents.forEach(event => {
+          document.removeEventListener(event, handleUserInteraction);
+        });
+      }
+    }
+
+    interactionEvents.forEach(event => {
+      document.addEventListener(event, handleUserInteraction, { passive: true });
+    });
+
+    // Prevent zoom on iOS when focusing inputs
+    if (isIOS) {
+      const viewportMeta = document.querySelector('meta[name="viewport"]');
+      viewportMeta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+    }
 
     // Initialize when page loads
     window.addEventListener('load', initializeApp);
+
+    // Wake lock for mobile (prevent screen from sleeping during recording)
+    let wakeLock = null;
+    
+    async function requestWakeLock() {
+      try {
+        if ('wakeLock' in navigator && isRecording) {
+          wakeLock = await navigator.wakeLock.request('screen');
+          console.log('Wake lock acquired');
+        }
+      } catch (err) {
+        console.log('Wake lock not supported or failed:', err);
+      }
+    }
+
+    function releaseWakeLock() {
+      if (wakeLock) {
+        wakeLock.release();
+        wakeLock = null;
+        console.log('Wake lock released');
+      }
+    }
+
+    // Override recording functions to include wake lock
+    const originalStartRecording = startRecording;
+    const originalStopRecording = stopRecording;
+
+    startRecording = async function() {
+      await originalStartRecording();
+      if (isRecording) {
+        await requestWakeLock();
+      }
+    };
+
+    stopRecording = function() {
+      originalStopRecording();
+      releaseWakeLock();
+    };
+
+    // Handle wake lock release when page becomes hidden
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        releaseWakeLock();
+      } else if (isRecording) {
+        requestWakeLock();
+      }
+    });
+
+    // Progressive Web App support
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then(registration => {
+            console.log('SW registered: ', registration);
+          })
+          .catch(registrationError => {
+            console.log('SW registration failed: ', registrationError);
+          });
+      });
+    }
+
+    // Handle connection status
+    function updateConnectionStatus() {
+      if (!navigator.onLine) {
+        status.textContent = 'No internet connection';
+        startBtn.disabled = true;
+      } else if (isCompatible) {
+        status.textContent = 'Ready to translate';
+        startBtn.disabled = false;
+      }
+    }
+
+    window.addEventListener('online', updateConnectionStatus);
+    window.addEventListener('offline', updateConnectionStatus);
+
   </script>
 </body>
 </html>
