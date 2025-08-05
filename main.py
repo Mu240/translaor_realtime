@@ -21,8 +21,9 @@ app = Flask(__name__, template_folder='templates')
 CORS(app, resources={r"/*": {"origins": ["http://localhost:3000"]}})  # Example origin
 
 # Validate OpenAI API key
-openai.api_key = "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"
-
+openai.api_key = "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"
+if not openai.api_key:
+    raise ValueError("OPENAI_API_KEY environment variable is not set")
 
 # Create thread pool for parallel processing
 executor = ThreadPoolExecutor(max_workers=3)
@@ -255,6 +256,4 @@ def transcribe_streaming():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-
     app.run(debug=False, host="0.0.0.0", port=5000, threaded=True)
-
